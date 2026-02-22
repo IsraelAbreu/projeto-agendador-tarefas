@@ -3,8 +3,11 @@ package com.javanauta.usuario.service;
 import com.javanauta.usuario.converter.UsuarioConverter;
 import com.javanauta.usuario.dto.UsuarioDTO;
 import com.javanauta.usuario.infraestructure.entity.Usuario;
+import com.javanauta.usuario.infraestructure.exceptions.ConflictException;
+import com.javanauta.usuario.infraestructure.exceptions.ResourceNotFoundException;
 import com.javanauta.usuario.infraestructure.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -12,13 +15,39 @@ import org.springframework.stereotype.Service;
 public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final UsuarioConverter usuarioConverter;
+    private final PasswordEncoder passwordEncoder;
 
     public UsuarioDTO salvarUsuario(UsuarioDTO usuarioDTO){
+        emailExiste(usuarioDTO.getEmail());
+        usuarioDTO.setSenha(passwordEncoder.encode(usuarioDTO.getSenha()));
         //convertendo de usuárioDTO para entity
         Usuario usuario = usuarioConverter.paraUsuario(usuarioDTO);
         //salvando o usuário
         usuario = usuarioRepository.save(usuario);
         //convertendo novamente da Entity para DTO
         return usuarioConverter.paraUsuarioDTO(usuario);
+    }
+
+    public void emailExiste(String email){
+        try {
+            boolean existe = verificaSeEmailExiste(email);
+            if (existe) {
+                throw new ConflictException("E-mail já cadastrado");
+            }
+        } catch (ConflictException e) {
+            throw new ConflictException("Email já cadastrado" + e.getCause());
+        }
+    }
+
+    public boolean verificaSeEmailExiste(String email){
+        return usuarioRepository.existsByEmail(email);
+    }
+
+    public Usuario buscarUsuarioPorEmail(String email){
+        return usuarioRepository.findByEmail(email).orElseThrow(() -> new ResourceNotFoundException("E-mail não encontrado" + email));
+    }
+
+    public void deletaUsuarioPorEmail(String email){
+        usuarioRepository.deleteByEmail(email);
     }
 }
